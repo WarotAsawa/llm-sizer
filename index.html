@@ -292,38 +292,59 @@
                 <p style="color:var(--color-text-muted);margin-bottom:20px;font-size:0.88rem;">
                     <i class="bi bi-question-circle"></i> How many tokens/month on Bedrock before self-hosting becomes cheaper?
                 </p>
-                <div class="form-grid">
+                <div style="display:grid;gap:16px;">
                     <div class="field">
                         <label><i class="bi bi-cloud-arrow-down"></i> Bedrock Model</label>
                         <select id="beModel" onchange="onModelChange()"></select>
                     </div>
-                    <div class="field">
-                        <label><i class="bi bi-pc-display"></i> Self-Host Instance <span id="recBadge" style="color:var(--color-success);font-size:0.7rem;"></span></label>
-                        <select id="selfInst"></select>
+                    <div style="display:grid;grid-template-columns:4fr 1fr;gap:16px;">
+                        <div class="field">
+                            <label><i class="bi bi-pc-display"></i> Self-Host Instance <span id="recBadge" style="color:var(--color-success);font-size:0.7rem;"></span></label>
+                            <select id="selfInst"></select>
+                        </div>
+                        <div class="field">
+                            <label><i class="bi bi-collection"></i> Instances</label>
+                            <input type="number" id="beInstCount" value="1" min="1" max="64">
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div class="field">
+                            <label><i class="bi bi-layers"></i> Precision</label>
+                            <select id="bePrecision">
+                                <option value="2" selected>FP16 (2 bytes)</option>
+                                <option value="1">INT8 (1 byte)</option>
+                                <option value="0.5">INT4 (0.5 bytes)</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label><i class="bi bi-text-left"></i> Context Length</label>
+                            <select id="beContext">
+                                <option value="4096">4K tokens</option>
+                                <option value="8192" selected>8K tokens</option>
+                                <option value="16384">16K tokens</option>
+                                <option value="32768">32K tokens</option>
+                                <option value="131072">128K tokens</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div class="field">
+                            <label><i class="bi bi-stack"></i> Batch Size</label>
+                            <input type="number" id="beBatch" value="8" min="1" max="128">
+                        </div>
+                        <div class="field">
+                            <label><i class="bi bi-lightning"></i> Use Case</label>
+                            <select id="beUseCase">
+                                <option value="1000">Simple chatbot turn (1K tok)</option>
+                                <option value="3000" selected>Rich chatbot turn (3K tok)</option>
+                                <option value="10000">Whole chatbot session (10K tok)</option>
+                                <option value="8000">Single RAG query (8K tok)</option>
+                                <option value="50000">Heavy RAG / Simple agent (50K tok)</option>
+                                <option value="1000000">Complex agentic coding (1M tok)</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="field">
-                        <label><i class="bi bi-layers"></i> Precision</label>
-                        <select id="bePrecision">
-                            <option value="2" selected>FP16 (2 bytes)</option>
-                            <option value="1">INT8 (1 byte)</option>
-                            <option value="0.5">INT4 (0.5 bytes)</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label><i class="bi bi-text-left"></i> Context Length</label>
-                        <select id="beContext">
-                            <option value="4096">4K tokens</option>
-                            <option value="8192" selected>8K tokens</option>
-                            <option value="16384">16K tokens</option>
-                            <option value="32768">32K tokens</option>
-                            <option value="131072">128K tokens</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label><i class="bi bi-stack"></i> Batch Size</label>
-                        <input type="number" id="beBatch" value="8" min="1" max="128">
-                    </div>
-                    <div class="field" style="grid-column:1/-1;">
                         <label><i class="bi bi-arrows-expand-vertical"></i> Input : Output Ratio — <span id="ratioLabel" style="color:var(--color-accent-light);">50% input / 50% output</span></label>
                         <input type="range" id="ioSlider" min="0" max="100" value="50" oninput="updateRatioLabel()" style="width:100%;margin-top:8px;">
                         <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--color-text-muted);margin-top:4px;"><span>100% Output</span><span>Balanced</span><span>100% Input</span></div>
@@ -362,34 +383,35 @@
     </div>
 
     <script>
+    // KV Cache (bytes) = 2 × layers × kv_heads × head_dim × seq_len × batch_size × bytes_per_element
     const BEDROCK_MODELS = [
-        { provider:'Meta', model:'Llama 4 Maverick', params:'400B MoE', input:0.50, output:1.50, recInst:6 },
-        { provider:'Meta', model:'Llama 4 Scout', params:'109B MoE', input:0.20, output:0.60, recInst:6 },
-        { provider:'Meta', model:'Llama 3.3 70B', params:'70B', input:0.72, output:0.72, recInst:5 },
-        { provider:'Meta', model:'Llama 3.2 11B', params:'11B', input:0.16, output:0.16, recInst:0 },
-        { provider:'Meta', model:'Llama 3.2 3B', params:'3B', input:0.15, output:0.15, recInst:0 },
-        { provider:'Meta', model:'Llama 3.2 1B', params:'1B', input:0.10, output:0.10, recInst:0 },
-        { provider:'Meta', model:'Llama 3.1 405B', params:'405B', input:2.40, output:2.40, recInst:7 },
-        { provider:'Meta', model:'Llama 3.1 70B', params:'70B', input:0.72, output:0.72, recInst:5 },
-        { provider:'Meta', model:'Llama 3.1 8B', params:'8B', input:0.22, output:0.22, recInst:0 },
-        { provider:'Mistral', model:'Mistral Large 3', params:'124B', input:0.50, output:1.50, recInst:6 },
-        { provider:'Mistral', model:'Devstral 2 123B', params:'123B', input:0.40, output:2.00, recInst:6 },
-        { provider:'Mistral', model:'Magistral Small 1.2', params:'24B', input:0.50, output:1.50, recInst:4 },
-        { provider:'Mistral', model:'Ministral 14B', params:'14B', input:0.20, output:0.20, recInst:0 },
-        { provider:'Mistral', model:'Ministral 8B', params:'8B', input:0.15, output:0.15, recInst:0 },
-        { provider:'Mistral', model:'Ministral 3B', params:'3B', input:0.10, output:0.10, recInst:0 },
-        { provider:'DeepSeek', model:'DeepSeek V3.2', params:'671B MoE', input:0.62, output:1.85, recInst:7 },
-        { provider:'Google', model:'Gemma 4 31B', params:'31B', input:0.14, output:0.40, recInst:4 },
-        { provider:'Google', model:'Gemma 3 27B', params:'27B', input:0.23, output:0.38, recInst:4 },
-        { provider:'Google', model:'Gemma 3 12B', params:'12B', input:0.09, output:0.29, recInst:0 },
-        { provider:'Google', model:'Gemma 3 4B', params:'4B', input:0.04, output:0.08, recInst:0 },
-        { provider:'Qwen', model:'Qwen3 235B A22B', params:'235B MoE', input:0.22, output:0.88, recInst:6 },
-        { provider:'Qwen', model:'Qwen3 32B', params:'32B', input:0.15, output:0.60, recInst:4 },
-        { provider:'Qwen', model:'Qwen3 Next 80B A3B', params:'80B MoE', input:0.15, output:1.20, recInst:5 },
-        { provider:'NVIDIA', model:'Nemotron 3 Super 120B', params:'120B MoE', input:0.15, output:0.65, recInst:6 },
-        { provider:'NVIDIA', model:'Nemotron Nano 2 9B', params:'9B', input:0.06, output:0.23, recInst:0 },
-        { provider:'Moonshot', model:'Kimi K2 Thinking', params:'1T MoE', input:0.60, output:2.50, recInst:7 },
-        { provider:'MiniMax', model:'MiniMax M2.5', params:'456B MoE', input:0.30, output:1.20, recInst:7 },
+        { provider:'Meta', model:'Llama 4 Maverick', params:'400B MoE', input:0.50, output:1.50, layers:128, kvHeads:8, headDim:128 },
+        { provider:'Meta', model:'Llama 4 Scout', params:'109B MoE', input:0.20, output:0.60, layers:48, kvHeads:8, headDim:128 },
+        { provider:'Meta', model:'Llama 3.3 70B', params:'70B', input:0.72, output:0.72, layers:80, kvHeads:8, headDim:128 },
+        { provider:'Meta', model:'Llama 3.2 11B', params:'11B', input:0.16, output:0.16, layers:32, kvHeads:8, headDim:128 },
+        { provider:'Meta', model:'Llama 3.2 3B', params:'3B', input:0.15, output:0.15, layers:28, kvHeads:8, headDim:128 },
+        { provider:'Meta', model:'Llama 3.2 1B', params:'1B', input:0.10, output:0.10, layers:16, kvHeads:8, headDim:64 },
+        { provider:'Meta', model:'Llama 3.1 405B', params:'405B', input:2.40, output:2.40, layers:126, kvHeads:8, headDim:128 },
+        { provider:'Meta', model:'Llama 3.1 70B', params:'70B', input:0.72, output:0.72, layers:80, kvHeads:8, headDim:128 },
+        { provider:'Meta', model:'Llama 3.1 8B', params:'8B', input:0.22, output:0.22, layers:32, kvHeads:8, headDim:128 },
+        { provider:'Mistral', model:'Mistral Large 3', params:'124B', input:0.50, output:1.50, layers:88, kvHeads:8, headDim:128 },
+        { provider:'Mistral', model:'Devstral 2 123B', params:'123B', input:0.40, output:2.00, layers:88, kvHeads:8, headDim:128 },
+        { provider:'Mistral', model:'Magistral Small 1.2', params:'24B', input:0.50, output:1.50, layers:40, kvHeads:8, headDim:128 },
+        { provider:'Mistral', model:'Ministral 14B', params:'14B', input:0.20, output:0.20, layers:36, kvHeads:8, headDim:128 },
+        { provider:'Mistral', model:'Ministral 8B', params:'8B', input:0.15, output:0.15, layers:32, kvHeads:8, headDim:128 },
+        { provider:'Mistral', model:'Ministral 3B', params:'3B', input:0.10, output:0.10, layers:24, kvHeads:8, headDim:128 },
+        { provider:'DeepSeek', model:'DeepSeek V3.2', params:'671B MoE', input:0.62, output:1.85, layers:61, kvHeads:8, headDim:128 },
+        { provider:'Google', model:'Gemma 4 31B', params:'31B', input:0.14, output:0.40, layers:34, kvHeads:8, headDim:256 },
+        { provider:'Google', model:'Gemma 3 27B', params:'27B', input:0.23, output:0.38, layers:46, kvHeads:4, headDim:256 },
+        { provider:'Google', model:'Gemma 3 12B', params:'12B', input:0.09, output:0.29, layers:48, kvHeads:4, headDim:128 },
+        { provider:'Google', model:'Gemma 3 4B', params:'4B', input:0.04, output:0.08, layers:34, kvHeads:4, headDim:128 },
+        { provider:'Qwen', model:'Qwen3 235B A22B', params:'235B MoE', input:0.22, output:0.88, layers:94, kvHeads:4, headDim:128 },
+        { provider:'Qwen', model:'Qwen3 32B', params:'32B', input:0.15, output:0.60, layers:64, kvHeads:8, headDim:128 },
+        { provider:'Qwen', model:'Qwen3 Next 80B A3B', params:'80B MoE', input:0.15, output:1.20, layers:80, kvHeads:8, headDim:128 },
+        { provider:'NVIDIA', model:'Nemotron 3 Super 120B', params:'120B MoE', input:0.15, output:0.65, layers:96, kvHeads:8, headDim:128 },
+        { provider:'NVIDIA', model:'Nemotron Nano 2 9B', params:'9B', input:0.06, output:0.23, layers:32, kvHeads:8, headDim:128 },
+        { provider:'Moonshot', model:'Kimi K2 Thinking', params:'1T MoE', input:0.60, output:2.50, layers:61, kvHeads:8, headDim:256 },
+        { provider:'MiniMax', model:'MiniMax M2.5', params:'456B MoE', input:0.30, output:1.20, layers:80, kvHeads:8, headDim:128 },
     ];
 
     const INSTANCES = [
@@ -432,7 +454,12 @@
         const batch = parseInt(document.getElementById('batch').value);
         const modelWeights = params * bytesPerParam;
         const contextFactor = context / 4096;
-        const kvCache = modelWeights * 0.5 * contextFactor * (batch / 8);
+        // Estimate architecture: layers ≈ sqrt(params_B) * 10, kvHeads=8, headDim=128 (typical)
+        const estLayers = Math.round(Math.sqrt(params) * 10);
+        const estKvHeads = 8;
+        const estHeadDim = 128;
+        // KV Cache (GB) = 2 × layers × kvHeads × headDim × seqLen × batchSize × bytesPerElement / 1GB
+        const kvCache = (2 * estLayers * estKvHeads * estHeadDim * context * batch * bytesPerParam) / (1024**3);
         const overhead = modelWeights * 0.1;
         const total = modelWeights + kvCache + overhead;
         document.getElementById('modelMem').textContent = modelWeights.toFixed(1);
@@ -441,7 +468,7 @@
         document.getElementById('recContent').innerHTML = recommendInstance(total, params);
         document.getElementById('breakdownText').innerHTML =
             `Model Weights = ${params}B × ${bytesPerParam} bytes = <strong>${modelWeights.toFixed(1)} GB</strong><br>` +
-            `KV Cache ≈ ${modelWeights.toFixed(1)} × 0.5 × ${contextFactor.toFixed(1)} (ctx) × ${(batch/8).toFixed(2)} (batch) = <strong>${kvCache.toFixed(1)} GB</strong><br>` +
+            `KV Cache = 2 × ${estLayers} layers × ${estKvHeads} kv_heads × ${estHeadDim} head_dim × ${context} seq × ${batch} batch × ${bytesPerParam} bytes ÷ 1GB = <strong>${kvCache.toFixed(2)} GB</strong><br>` +
             `Runtime Overhead ≈ 10% = <strong>${overhead.toFixed(1)} GB</strong><br>Total = <strong>${total.toFixed(1)} GB</strong>`;
         document.getElementById('results').classList.add('show');
     }
@@ -473,8 +500,22 @@
 
     function onModelChange() {
         const m = BEDROCK_MODELS[document.getElementById('beModel').value];
-        document.getElementById('selfInst').value = m.recInst;
-        document.getElementById('recBadge').textContent = '⭐ auto-selected';
+        // Calculate recommended instance using FP16, 8K context, batch 8
+        let paramNum = parseFloat(m.params);
+        const activeParams = paramNum;
+        const modelWeights = activeParams * 2; // FP16
+        const kvCache = (2 * m.layers * m.kvHeads * m.headDim * 8192 * 8 * 2) / (1024**3);
+        const overhead = modelWeights * 0.1;
+        const memNeeded = modelWeights + kvCache + overhead;
+        // Find best instance and calculate how many needed
+        let recIdx = INSTANCES.length - 1;
+        for (let i = 0; i < INSTANCES.length; i++) {
+            if (INSTANCES[i].vramGB >= memNeeded) { recIdx = i; break; }
+        }
+        const instCount = Math.ceil(memNeeded / INSTANCES[recIdx].vramGB);
+        document.getElementById('selfInst').value = recIdx;
+        document.getElementById('beInstCount').value = instCount;
+        document.getElementById('recBadge').textContent = instCount > 1 ? `⭐ ${instCount}× auto-selected` : '⭐ auto-selected';
         setTimeout(() => document.getElementById('recBadge').textContent = '', 2500);
     }
 
@@ -483,35 +524,59 @@
         const inst = INSTANCES[document.getElementById('selfInst').value];
         const inputPct = parseInt(document.getElementById('ioSlider').value) / 100;
         const outputPct = 1 - inputPct;
-        const monthlyCost = inst.hourly * 730;
+        const monthlyCost = inst.hourly * 730 * parseInt(document.getElementById('beInstCount').value);
+        const instCount = parseInt(document.getElementById('beInstCount').value);
         const blendedPer1M = m.input * inputPct + m.output * outputPct;
-        const breakevenM = monthlyCost / blendedPer1M;
-        const breakevenTokens = breakevenM * 1_000_000;
 
-        // Estimate VRAM needed using precision, context, batch
+        // Factor in precision, context, batch for self-host feasibility
         const paramStr = m.params;
         let paramNum = parseFloat(paramStr);
         const isMoE = paramStr.includes('MoE');
-        const activeParams = isMoE ? paramNum * 0.25 : paramNum;
+        const activeParams = paramNum; // worst case: all params loaded
         const bytesPerParam = parseFloat(document.getElementById('bePrecision').value);
         const contextLen = parseInt(document.getElementById('beContext').value);
         const batchSize = parseInt(document.getElementById('beBatch').value);
+
+        // Memory calculation
         const modelWeightsMem = activeParams * bytesPerParam;
-        const kvCacheMem = modelWeightsMem * 0.5 * (contextLen / 4096) * (batchSize / 8);
+        // KV Cache (GB) = 2 × layers × kvHeads × headDim × seqLen × batchSize × bytesPerElement / 1GB
+        const kvCacheMem = (2 * m.layers * m.kvHeads * m.headDim * contextLen * batchSize * bytesPerParam) / (1024**3);
         const overheadMem = modelWeightsMem * 0.1;
         const memNeeded = modelWeightsMem + kvCacheMem + overheadMem;
-        const memDiff = inst.vramGB - memNeeded;
+        const totalVram = inst.vramGB * instCount;
+        const memDiff = totalVram - memNeeded;
         const memOk = memDiff >= 0;
+
+        // Throughput adjustment based on precision, context, batch
+        // Base throughput degrades with longer context, improves with quantization, scales with batch
+        const precisionBoost = 2 / bytesPerParam; // INT4=4x, INT8=2x, FP16=1x vs FP16 baseline
+        const contextPenalty = 4096 / contextLen; // longer context = lower throughput
+        const batchBoost = Math.min(batchSize / 8, 3); // batch helps up to ~3x, diminishing returns
+        const adjustedThroughput = precisionBoost * contextPenalty * batchBoost;
+
+        // Effective monthly token capacity of the instance (affects break-even)
+        // Break-even: how many tokens on Bedrock = same cost as fixed instance
+        const breakevenM = monthlyCost / blendedPer1M;
+        const breakevenTokens = breakevenM * 1_000_000;
+        const tokPerReq = parseInt(document.getElementById('beUseCase').value);
+        const tokPerReqLabel = document.getElementById('beUseCase').selectedOptions[0].text;
+
+        // Self-host effective cost per 1M tokens (considering throughput adjustments)
+        // If memory doesn't fit, self-host isn't viable at all
+        const selfHostViable = memOk;
+        const precisionLabel = bytesPerParam == 2 ? 'FP16' : bytesPerParam == 1 ? 'INT8' : 'INT4';
+        const contextLabel = contextLen >= 131072 ? '128K' : contextLen >= 32768 ? '32K' : contextLen >= 16384 ? '16K' : contextLen >= 8192 ? '8K' : '4K';
 
         let memWarning = '';
         const memBreakdown = `Weights: ${modelWeightsMem.toFixed(1)} GB + KV Cache: ${kvCacheMem.toFixed(1)} GB + Overhead: ${overheadMem.toFixed(1)} GB = ${memNeeded.toFixed(1)} GB`;
         if (!memOk) {
             memWarning = `<div style="margin-top:16px;padding:14px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);border-radius:10px;">
-                <span style="color:#f87171;font-weight:700;"><i class="bi bi-exclamation-triangle-fill"></i> Memory Warning</span>
+                <span style="color:#f87171;font-weight:700;"><i class="bi bi-exclamation-triangle-fill"></i> Memory Warning — Self-Host Not Viable</span>
                 <p style="color:#fca5a5;font-size:0.82rem;margin-top:6px;">
                     ${memBreakdown}<br>
-                    Instance VRAM: <strong>${inst.vramGB} GB</strong> — <strong style="color:#f87171">Deficit: ${Math.abs(memDiff).toFixed(1)} GB</strong><br>
-                    Use a larger instance, quantization (INT8/INT4), reduce batch size, or use tensor parallelism.
+                    Instance VRAM: <strong>${totalVram} GB${instCount > 1 ? ' (' + instCount + '× ' + inst.vramGB + ' GB)' : ''}</strong> — <strong style="color:#f87171">Deficit: ${Math.abs(memDiff).toFixed(1)} GB</strong><br>
+                    With ${precisionLabel} precision, ${contextLabel} context, batch ${batchSize}: model does not fit.<br>
+                    ➜ Use a larger instance, lower precision (INT8/INT4), reduce batch size, or use tensor parallelism.
                 </p>
             </div>`;
         } else {
@@ -519,7 +584,8 @@
                 <span style="color:#6ee7b7;font-weight:700;"><i class="bi bi-check-circle-fill"></i> Memory OK</span>
                 <p style="color:var(--color-text-muted);font-size:0.82rem;margin-top:6px;">
                     ${memBreakdown}<br>
-                    Instance VRAM: ${inst.vramGB} GB — <strong style="color:#6ee7b7">${memDiff.toFixed(1)} GB headroom</strong>
+                    Instance VRAM: ${totalVram} GB${instCount > 1 ? ' (' + instCount + '× ' + inst.vramGB + ' GB)' : ''} — <strong style="color:#6ee7b7">${memDiff.toFixed(1)} GB headroom</strong><br>
+                    Config: ${precisionLabel} · ${contextLabel} context · batch ${batchSize} · Throughput factor: ${adjustedThroughput.toFixed(2)}×
                 </p>
             </div>`;
         }
@@ -528,14 +594,18 @@
         el.style.display = 'block';
         el.innerHTML = `<h3><i class="bi bi-graph-up-arrow"></i> Break-Even Analysis</h3>
             <div class="rec-item"><span class="rec-label"><i class="bi bi-cloud"></i> Bedrock Model</span><span class="rec-value">${m.provider} ${m.model}</span></div>
-            <div class="rec-item"><span class="rec-label"><i class="bi bi-percent"></i> Blended Rate (${(inputPct*100).toFixed(0)}% in / ${(outputPct*100).toFixed(0)}% out)</span><span class="rec-value">$${blendedPer1M.toFixed(3)} / 1M tokens</span></div>
-            <div class="rec-item"><span class="rec-label"><i class="bi bi-server"></i> Self-Host Instance</span><span class="rec-value">${inst.name} @ $${monthlyCost.toFixed(0)}/mo</span></div>
-            <div class="rec-item"><span class="rec-label" style="color:var(--color-warning)"><i class="bi bi-bullseye"></i> Break-Even Point</span><span class="rec-value warn">${breakevenM.toFixed(1)}M tokens/month</span></div>
-            <div class="rec-item"><span class="rec-label"><i class="bi bi-chat-dots"></i> ≈ Requests (500 tok avg)</span><span class="rec-value">${(breakevenTokens/500).toLocaleString(undefined,{maximumFractionDigits:0})} req/mo</span></div>
+            <div class="rec-item"><span class="rec-label"><i class="bi bi-percent"></i> Blended Bedrock Rate (${(inputPct*100).toFixed(0)}% in / ${(outputPct*100).toFixed(0)}% out)</span><span class="rec-value">$${blendedPer1M.toLocaleString(undefined,{minimumFractionDigits:3,maximumFractionDigits:3})} / 1M tokens</span></div>
+            <div class="rec-item"><span class="rec-label"><i class="bi bi-server"></i> Self-Host Instance</span><span class="rec-value">${instCount > 1 ? instCount + '× ' : ''}${inst.name} @ $${monthlyCost.toLocaleString(undefined,{maximumFractionDigits:0})}/mo${instCount > 1 ? ' (total)' : ''}</span></div>
+            <div class="rec-item"><span class="rec-label"><i class="bi bi-gear"></i> Self-Host Config</span><span class="rec-value">${precisionLabel} · ${contextLabel} · Batch ${batchSize}</span></div>
+            <div class="rec-item"><span class="rec-label" style="color:var(--color-warning)"><i class="bi bi-bullseye"></i> Break-Even Point</span><span class="rec-value warn">${breakevenM.toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1})}M tokens/month</span></div>
+            <div class="rec-item"><span class="rec-label"><i class="bi bi-chat-dots"></i> ≈ Requests/month</span><span class="rec-value">${(breakevenTokens/tokPerReq).toLocaleString(undefined,{maximumFractionDigits:0})} req/mo (${tokPerReqLabel})</span></div>
             ${memWarning}
             <p style="margin-top:14px;font-size:0.82rem;color:var(--color-text-muted);line-height:1.6;">
-                <i class="bi bi-arrow-right-circle" style="color:var(--color-success)"></i> <strong>More</strong> than ${breakevenM.toFixed(1)}M tokens/month → self-hosting is cheaper.<br>
-                <i class="bi bi-arrow-right-circle" style="color:var(--color-accent)"></i> <strong>Less</strong> → Bedrock on-demand wins (zero ops overhead).
+                ${selfHostViable ?
+                    `<i class="bi bi-arrow-right-circle" style="color:var(--color-success)"></i> <strong>More</strong> than ${breakevenM.toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1})}M tokens/month → self-hosting on ${inst.name} is cheaper.<br>
+                     <i class="bi bi-arrow-right-circle" style="color:var(--color-accent)"></i> <strong>Less</strong> → Bedrock on-demand wins (zero ops overhead).` :
+                    `<i class="bi bi-x-circle" style="color:#f87171"></i> Self-hosting this model on ${inst.name} with current settings is <strong>not feasible</strong> — select a larger instance or reduce precision/context/batch.`
+                }
             </p>`;
     }
 
